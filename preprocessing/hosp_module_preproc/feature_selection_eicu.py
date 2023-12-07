@@ -29,7 +29,7 @@ if not os.path.exists(local+"/features"):
     os.makedirs(local+"/features")
     
     
-def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=True,chart_flag=True,proc_flag=True,med_flag=True, ing_flag=True, lab_flag=True):
+def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=True,chart_flag=True,proc_flag=True,med_flag=True, ing_flag=True, lab_flag=True, ape_flag=True, pe_flag=True):
     # if diag_flag:
     #     print("[EXTRACTING DIAGNOSIS DATA]")
     #     diag = preproc_icd_module(root_dir+version_path+"/hosp/diagnoses_icd.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz', './utils/mappings/ICD9_to_ICD10_mapping.txt', map_code_colname='diagnosis_code')
@@ -56,8 +56,8 @@ def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=
     
     if proc_flag:
         print("[EXTRACTING PROCEDURES DATA]")
-        proc = preproc_proc(root_dir+'/'+version_path+"/treatment.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz', 'treatmentoffset', dtypes=None, usecols=['patientunitstayid','treatmentoffset','treatmentid'])
-        proc[['uniquepid', 'patienthealthsystemstayid', 'patientunitstayid', 'treatmentid', 'treatmentoffset', 'unitadmissionoffset', 'event_time_from_admit']].to_csv(local+"/features/preproc_proc_icu.csv.gz", compression='gzip', index=False)
+        proc = preproc_proc(root_dir+'/'+version_path+"/treatment.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz', 'treatmentoffset', dtypes=None, usecols=['patientunitstayid','treatmentoffset','treatmentid', 'treatmentstring'])
+        proc[['uniquepid', 'patienthealthsystemstayid', 'patientunitstayid', 'treatmentid', 'treatmentoffset','treatmentstring','unitadmissionoffset', 'event_time_from_admit']].to_csv(local+"/features/preproc_proc_icu.csv.gz", compression='gzip', index=False)
         print("[SUCCESSFULLY SAVED PROCEDURES DATA]")
     
     if med_flag:
