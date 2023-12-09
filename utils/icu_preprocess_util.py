@@ -276,3 +276,118 @@ def preproc_chart(chart_path: str, respir_path: str, cohort_path:str) -> pd.Data
 
     # Only return module measurements within the observation range, sorted by subject_id
     return df_cohort
+
+
+def preproc_period(period_path: str, aperiod_path: str, cohort_path:str) -> pd.DataFrame:
+    """Function for getting hosp observations pertaining to a pickled cohort. Function is structured to save memory when reading and transforming data."""
+    
+    # Only consider values in our cohort
+    cohort = pd.read_csv(cohort_path, low_memory=False, compression='gzip')
+    df_cohort=pd.DataFrame()
+    
+    dataset_path_list = [period_path, aperiod_path]
+    for dataset_path in dataset_path_list:
+        
+        if dataset_path == period_path:
+            
+            usecols = ['vitalperiodicid', 'patientunitstayid', 'observationoffset', 'temperature',
+                       'sao2', 'heartrate', 'respiration', 'cvp', 'etco2', 'systemicsystolic', 'systemicdiastolic']
+            dtypes = {
+                        'patientunitstayid':'int64',
+                        'observationoffset':'int64',      
+                        'temperature':'float64',
+                        'sao2':'float64',
+                        'heartrate':'float64',
+                        'respiration':'float64',
+                        'cvp':'float64',
+                        'etco2':'float64'
+                        }
+            
+            
+            periodic = pd.read_csv(period_path, compression='gzip', usecols=usecols, dtype=dtypes, header=0)
+            melted_df = periodic.melt(id_vars=['vitalperiodicid','patientunitstayid', 'observationoffset'],
+                    value_vars=['temperature', 'sao2', 'heartrate', 'respiration', 'cvp',
+                                'etco2', 'systemicsystolic', 'systemicdiastolic'],
+                    var_name='nursingchartcelltypevallabel', value_name='nursingchartvalue')
+            
+            melted_df = melted_df.rename(columns={'observationoffset':'event_time_from_admit', 'vitalperiodicid': 'nursingchartid'})   
+            melted_df=melted_df.dropna()
+            melted_df=melted_df.merge(cohort[['patientunitstayid', 'uniquepid']], how='inner', left_on='patientunitstayid', right_on='patientunitstayid')
+            
+            if df_cohort.empty:
+                df_cohort=melted_df
+            else:
+                df_cohort=df_cohort.append(melted_df, ignore_index=True)
+                
+        elif dataset_path == aperiod_path:
+            
+            usecols = ['vitalaperiodicid','patientunitstayid', 'observationoffset', 'noninvasivesystolic', 'noninvasivediastolic', 'paop',
+                       'cardiacoutput']
+            dtypes = {
+                        'patientunitstayid':'int64',
+                        'observationoffset':'int64',      
+                        'noninvasivesystolic':'float64',
+                        'noninvasivediastolic':'float64',
+                        'paop':'float64',
+                        'cardiacoutput':'float64'
+                        }
+            
+            aperiodic = pd.read_csv(aperiod_path, compression='gzip', usecols=usecols, dtype=dtypes, header=0)
+            
+            melted_df = aperiodic.melt(id_vars=['vitalaperiodicid','patientunitstayid', 'observationoffset'],
+                    value_vars=['noninvasivesystolic', 'noninvasivediastolic', 'paop', 'cardiacoutput'],
+                    var_name='nursingchartcelltypevallabel', value_name='nursingchartvalue')
+            
+            melted_df = melted_df.rename(columns={'observationoffset':'event_time_from_admit', 'vitalaperiodicid': 'nursingchartid'})
+                        
+            melted_df=melted_df.dropna()
+            melted_df=melted_df.merge(cohort[['patientunitstayid', 'uniquepid']], how='inner', left_on='patientunitstayid', right_on='patientunitstayid')
+
+            if df_cohort.empty:
+                df_cohort=melted_df
+            else:
+                df_cohort=df_cohort.append(melted_df, ignore_index=True)
+            
+
+    print("# Unique Events:  ", df_cohort.nursingchartid.nunique())
+    print("# Admissions:  ", df_cohort.patientunitstayid.nunique())
+    print("Total rows", df_cohort.shape[0])
+
+    return df_cohort
+
+def preproc_microlabs(microlab_path: str, cohort_path:str) -> pd.DataFrame:
+    """Function for getting hosp observations pertaining to a pickled cohort. Function is structured to save memory when reading and transforming data."""
+    
+    df_cohort=pd.DataFrame()
+    cohort = pd.read_csv(cohort_path, low_memory=False, compression='gzip')
+            
+    usecols = ['microlabid', 'patientunitstayid', 'culturetakenoffset', 'culturesite', 'antibiotic']
+    dtypes = {
+                'microlabid':'int64',
+                'patientunitstayid':'int64',
+                'culturetakenoffset':'int64',      
+                'culturesite':'object',
+                'antibiotic':'object'
+                }
+    
+    microlab = pd.read_csv(microlab_path, compression='gzip', usecols=usecols, dtype=dtypes)
+    
+    culture = microlab[['microlabid', 'patientunitstayid', 'culturetakenoffset', 'culturesite']].dropna()
+    culture = culture.rename(columns = {'culturesite':'labname', 'culturetakenoffset':'labresultoffset', 'microlabid':'labid'})
+    
+    antibiotic = microlab[['microlabid', 'patientunitstayid', 'culturetakenoffset', 'antibiotic']].dropna()
+    antibiotic = antibiotic.rename(columns = {'antibiotic':'labname', 'culturetakenoffset':'labresultoffset','microlabid':'labid'})
+    
+    chunk = pd.concat([culture, antibiotic], ignore_index=True)
+    chunk = chunk.merge(cohort[['uniquepid','patientunitstayid', 'unitadmissionoffset', 'unitdischargeoffset']], how='inner', left_on='patientunitstayid', right_on='patientunitstayid')
+
+    chunk['lab_time_from_admit'] = chunk['labresultoffset']
+    chunk=chunk.dropna()
+        
+    df_cohort=chunk
+
+    print("# Itemid: ", df_cohort.labid.nunique())
+    print("# Admissions: ", df_cohort.patientunitstayid.nunique())
+    print("Total number of rows: ", df_cohort.shape[0])
+    
+    return df_cohort
