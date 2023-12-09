@@ -11,11 +11,11 @@ importlib.reload(utils.icu_preprocess_util)
 import utils.icu_preprocess_util
 from utils.icu_preprocess_util import *# module of preprocessing functions
 
-# import utils.outlier_removal
-# from utils.outlier_removal import *  
-# importlib.reload(utils.outlier_removal)
-# import utils.outlier_removal
-# from utils.outlier_removal import *
+import utils.outlier_removal
+from utils.outlier_removal import *  
+importlib.reload(utils.outlier_removal)
+import utils.outlier_removal
+from utils.outlier_removal import *
 
 # import utils.uom_conversion
 # from utils.uom_conversion import *  
@@ -115,10 +115,10 @@ def features_selection_icu(local, cohort_output,  diag_flag, proc_flag, med_flag
             print("[FEATURE SELECTION INGREDIENTS DATA]")
             ing = pd.read_csv(local+'/'+"features/preproc_ing_icu.csv.gz", compression='gzip',header=0)
             features=pd.read_csv(local+'/'+"summary/total_med_infusion_intake.csv",header=0)
-            ing=ing[ing['itemid'].isin(features['itemstring'].unique())]
+            ing=ing[ing['drugname'].isin(features['itemstring'].unique())]
             print("Total number of rows",ing.shape[0])
             rename_dict = dict(zip(features.itemstring, features.altername))
-            ing['celllabel'] = ing['celllabel'].map(rename_dict)
+            ing['drugname'] = ing['drugname'].map(rename_dict)
             ing.to_csv(local+'/'+'features/preproc_ing(selected)_icu.csv.gz', compression='gzip', index=False)
             print("[SUCCESSFULLY SAVED INGREDIENTS DATA]")
     
@@ -159,7 +159,7 @@ def features_selection_icu(local, cohort_output,  diag_flag, proc_flag, med_flag
             total_chart=total_chart[total_chart['nursingchartcelltypevallabel'].isin(features['itemstring'].unique())]
             print("Total number of rows",total_chart.shape[0])
             rename_dict = dict(zip(features.itemstring, features.altername))
-            total_chart['celllabel'] = total_chart['celllabel'].map(rename_dict)
+            total_chart['nursingchartcelltypevallabel'] = total_chart['nursingchartcelltypevallabel'].map(rename_dict)
             total_chart.to_csv(local+'/'+"features/preproc_chart(selected)_icu.csv.gz", compression='gzip', index=False)
             print("[SUCCESSFULLY SAVED CHART EVENTS DATA]")
             
@@ -188,3 +188,29 @@ def features_selection_icu(local, cohort_output,  diag_flag, proc_flag, med_flag
             microlabs['labname'] = microlabs['labname'].map(rename_dict)
             microlabs.to_csv(local+'/'+"features/preproc_microlabs(selected).csv.gz", compression='gzip', index=False)
             print("[SUCCESSFULLY SAVED MICROLABS DATA]")
+            
+            
+def preprocess_feature_icu(chart_flag,clean_chart,impute_outlier_chart,thresh,left_thresh,
+                            lab_flag, imput_outlier_lab, thresh_lab, left_thresh_lab, clean_labs):
+    
+    if chart_flag:
+        if clean_chart:
+            print("[PROCESSING CHART EVENTS DATA]")
+            chart = pd.read_csv(local+"/features/preproc_chart_icu.csv.gz", compression='gzip',header=0)
+            chart['nursingchartvalue'] = pd.to_numeric(chart['nursingchartvalue'], errors='coerce')
+            chart = chart.dropna(subset=['nursingchartvalue'])
+            chart = outlier_imputation(chart, 'nursingchartcelltypevallabel', 'nursingchartvalue', thresh,left_thresh,impute_outlier_chart)
+            
+            print("Total number of rows",chart.shape[0])
+            chart.to_csv(local+"/features/preproc_chart(selected)_icu.csv.gz", compression='gzip', index=False)
+            print("[SUCCESSFULLY SAVED CHART EVENTS DATA]")
+            
+    if lab_flag:  
+        if clean_labs:   
+            print("[PROCESSING LABS DATA]")
+            labs = pd.read_csv(local+"/features/preproc_labs(selected).csv.gz", compression='gzip',header=0)
+            labs = outlier_imputation(labs, 'labname', 'labresult', thresh_lab,left_thresh_lab,imput_outlier_lab)
+            
+            print("Total number of rows",labs.shape[0])
+            labs.to_csv(local+"/features/preproc_labs(selected).csv.gz", compression='gzip', index=False)
+            print("[SUCCESSFULLY SAVED LABS DATA]")    
