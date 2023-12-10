@@ -74,7 +74,7 @@ def generate_chart(data):
         chart['sanity']=chart['los(hour)']-chart['start_time']
         chart=chart[chart['sanity']>0]
         del chart['sanity']
-        del chart['los']
+        del chart['los(hour)']
         
         if final.empty:
             final=chart
