@@ -29,7 +29,7 @@ if not os.path.exists(local+"/features"):
     os.makedirs(local+"/features")
     
     
-def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=True,chart_flag=True,proc_flag=True,med_flag=True, ing_flag=True, lab_flag=True, pe_flag=True, microlab_flag=True):
+def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=True,chart_flag=True,proc_flag=True,med_flag=True, ing_flag=True, lab_flag=True, pe_flag=True, microlab_flag=True, vent_flag=True):
     # if diag_flag:
     #     print("[EXTRACTING DIAGNOSIS DATA]")
     #     diag = preproc_icd_module(root_dir+version_path+"/hosp/diagnoses_icd.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz', './utils/mappings/ICD9_to_ICD10_mapping.txt', map_code_colname='diagnosis_code')
@@ -84,9 +84,15 @@ def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=
         ing[['uniquepid', 'patienthealthsystemstayid', 'patientunitstayid', 'infusiondrugid', 'start_hours_from_admit', 'stop_hours_from_admit', 'drugname','drugrate']].to_csv(local+'/features/preproc_ing_icu.csv.gz', compression='gzip', index=False)
         print("[SUCCESSFULLY SAVED INGREDIENTS DATA]")
         
+    if vent_flag:
+        print("[EXTRACTING VENTILATION DATA]")
+        ing = preproc_vent(root_dir+'/'+version_path+"/respiratoryCharting.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz')
+        ing[['respchartid', 'patientunitstayid', 'ventstartoffset', 'ventendoffset', 'label']].to_csv(local+'/features/preproc_vent_icu.csv.gz', compression='gzip', index=False)
+        print("[SUCCESSFULLY SAVED VENTILATION DATA]")
+        
         
 def features_selection_icu(local, cohort_output,  diag_flag, proc_flag, med_flag, ing_flag, out_flag, lab_flag, chart_flag, microlab_flag,
-                           group_diag, group_med, group_ing, group_proc, group_out, group_chart, group_microlab, clean_labs):
+                           group_diag, group_med, group_ing, group_proc, group_out, group_chart,clean_labs,  group_microlab):
     # if diag_flag:
     #     if group_diag:
     #         print("[FEATURE SELECTION DIAGNOSIS DATA]")
@@ -179,7 +185,7 @@ def features_selection_icu(local, cohort_output,  diag_flag, proc_flag, med_flag
     if microlab_flag:
         if group_microlab:            
             print("[FEATURE SELECTION MICROLABS DATA]")
-            microlabs=pd.read_csv(local+'/'+"features/preproc_labs.csv.gz", compression='gzip',header=0, index_col=None)
+            microlabs=pd.read_csv(local+'/'+"features/preproc_microlabs.csv.gz", compression='gzip',header=0, index_col=None)
 
             features=pd.read_csv(local+'/'+"summary/total_lab_chart.csv",header=0)
             microlabs=microlabs[microlabs['labname'].isin(features['itemstring'].unique())]
@@ -196,9 +202,10 @@ def preprocess_feature_icu(chart_flag,clean_chart,impute_outlier_chart,thresh,le
     if chart_flag:
         if clean_chart:
             print("[PROCESSING CHART EVENTS DATA]")
-            chart = pd.read_csv(local+"/features/preproc_chart_icu.csv.gz", compression='gzip',header=0)
+            chart = pd.read_csv(local+"/features/preproc_chart(selected)_icu.csv.gz", compression='gzip',header=0, low_memory=False)
             chart['nursingchartvalue'] = pd.to_numeric(chart['nursingchartvalue'], errors='coerce')
             chart = chart.dropna(subset=['nursingchartvalue'])
+            chart = chart.reset_index(drop=True)
             chart = outlier_imputation(chart, 'nursingchartcelltypevallabel', 'nursingchartvalue', thresh,left_thresh,impute_outlier_chart)
             
             print("Total number of rows",chart.shape[0])
@@ -208,7 +215,7 @@ def preprocess_feature_icu(chart_flag,clean_chart,impute_outlier_chart,thresh,le
     if lab_flag:  
         if clean_labs:   
             print("[PROCESSING LABS DATA]")
-            labs = pd.read_csv(local+"/features/preproc_labs(selected).csv.gz", compression='gzip',header=0)
+            labs = pd.read_csv(local+"/features/preproc_labs(selected).csv.gz", compression='gzip',header=0, low_memory=False)
             labs = outlier_imputation(labs, 'labname', 'labresult', thresh_lab,left_thresh_lab,imput_outlier_lab)
             
             print("Total number of rows",labs.shape[0])

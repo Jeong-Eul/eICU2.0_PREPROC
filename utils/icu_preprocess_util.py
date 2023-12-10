@@ -391,3 +391,43 @@ def preproc_microlabs(microlab_path: str, cohort_path:str) -> pd.DataFrame:
     print("Total number of rows: ", df_cohort.shape[0])
     
     return df_cohort
+
+
+def preproc_vent(module_path:str, adm_cohort_path:str) -> pd.DataFrame:
+      
+    adm = pd.read_csv(adm_cohort_path,compression='gzip', low_memory=False, usecols=['uniquepid', 'patienthealthsystemstayid', 'patientunitstayid', 'unitadmissionoffset'])
+    respchart = pd.read_csv(module_path, compression='gzip', low_memory=False, usecols=['respchartid', 'patientunitstayid','respchartoffset','respchartentryoffset', 'respcharttypecat', 'respchartvaluelabel', 'respchartvalue'])
+    respchart = respchart[respchart['respchartvaluelabel']=='RT Vent On/Off'].sort_values(by=['patientunitstayid', 'respchartoffset'])
+    
+    def process_patient_group(group):
+            if 'Start' in group['respchartvalue'].values:
+                start_row = group[group['respchartvalue'] == 'Start'].iloc[0]
+            else:
+                return None
+            
+
+            if 'Off' in group['respchartvalue'].values:
+                off_row = group[group['respchartvalue'] == 'Off'].iloc[-1]
+            else:
+                off_row = group.iloc[-1]
+
+            return {
+                'respchartid': start_row['respchartid'],
+                'patientunitstayid': start_row['patientunitstayid'],
+                'ventstartoffset': start_row['respchartoffset'],
+                'ventendoffset': off_row['respchartoffset'],
+                'label': 'Ventilator'
+            }
+
+    # 환자별로 그룹화하여 각 그룹에 대해 process_patient_group 함수 적용
+    grouped = respchart.groupby('patientunitstayid')
+    result = [process_patient_group(group) for _, group in grouped]
+
+    # 결과를 데이터 프레임으로 변환 (None 값 제외)
+    vent = pd.DataFrame([r for r in result if r is not None])
+
+
+    print("# Admissions:  ", vent.patientunitstayid.nunique())
+    print("# Total rows",  vent.shape[0])
+    
+    return vent
