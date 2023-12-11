@@ -81,7 +81,7 @@ def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=
     if ing_flag:
         print("[EXTRACTING INGREDIENTS DATA]")
         ing = preproc_ings(root_dir+'/'+version_path+"/infusionDrug.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz')
-        ing[['uniquepid', 'patienthealthsystemstayid', 'patientunitstayid', 'infusiondrugid', 'start_hours_from_admit', 'stop_hours_from_admit', 'drugname','drugrate']].to_csv(local+'/features/preproc_ing_icu.csv.gz', compression='gzip', index=False)
+        ing[['uniquepid', 'patienthealthsystemstayid', 'patientunitstayid', 'infusiondrugid', 'start_hours_from_admit', 'stop_hours_from_admit', 'drugname','drugrate', 'infusionrate']].to_csv(local+'/features/preproc_ing_icu.csv.gz', compression='gzip', index=False)
         print("[SUCCESSFULLY SAVED INGREDIENTS DATA]")
         
     if vent_flag:

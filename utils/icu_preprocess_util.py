@@ -36,17 +36,30 @@ def preproc_ings(module_path:str, adm_cohort_path:str) -> pd.DataFrame:
     #    'Scale A', 'mL', 'Human', 'ml', 'ARTERIAL LINE', 'BNP',
     #    'units/kg/min'
     
+    unit = ['mcg/kg/min', 'mcg/min', 'ml/hr', 'mg/min', 'units/hr', 'mg/hr',
+       'units/min', 'mcg/kg/hr', 'mcg/hr', 'mg/kg/min', 'Unknown',
+       'Aviva', 'mg/kg/hr', 'nanograms/kg/min', 'units/kg/hr', 'Scale B',
+       'Scale A', 'mL', 'Human', 'ml', 'ARTERIAL LINE', 'BNP',
+       'units/kg/min']
+    
     ing['stop_hours_from_admit'] = 0
     ing['drugamount']= ing['drugamount'].fillna(0) 
     ing['infusionrate']= ing['infusionrate'].fillna(0) 
     ing['volumeoffluid']= ing['volumeoffluid'].fillna(0) 
     
     idx = ing[ing['infusionrate']==0].index
-    indx = ing[~(ing['infusionrate']==0)].index
+    indx = ing[~(ing['infusionrate']==0) & (ing['unit_time'].isin(unit))].index
     
     ing['stop_hours_from_admit'].loc[idx] = ing['start_hours_from_admit'].loc[idx]
-    ing['stop_hours_from_admit'].loc[indx] =  ((ing['volumeoffluid'].loc[indx]/ing['infusionrate'].loc[indx])*60).apply(math.ceil) + ing['start_hours_from_admit'].loc[indx]
     
+    for index in indx:
+        if ing['unit_time'].loc[index].split('/')[-1] == 'min':
+            ing['stop_hours_from_admit'].loc[index] = math.ceil(ing['volumeoffluid'].loc[index] / ing['infusionrate'].loc[index]) + ing['start_hours_from_admit'].loc[index]
+        elif ing['unit_time'].loc[index].split('/')[-1] == 'hr':
+            ing['stop_hours_from_admit'].loc[index] = math.ceil(60 * ing['volumeoffluid'].loc[index] / ing['infusionrate'].loc[index]) + ing['start_hours_from_admit'].loc[index]
+        else: 
+            ing['stop_hours_from_admit'].loc[index] =  ((ing['volumeoffluid'].loc[index]/ing['infusionrate'].loc[index])).apply(math.ceil) + ing['start_hours_from_admit'].loc[index]
+
     #print(ing.isna().sum())
     # ing=ing.dropna()
     null_columns = ['unitadmissionoffset', 'start_hours_from_admit', 'stop_hours_from_admit', 'infusionoffset']
