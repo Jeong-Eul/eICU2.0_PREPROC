@@ -61,10 +61,10 @@ def feature_icu(root_dir, cohort_output, version_path, diag_flag=False,out_flag=
         print("[SUCCESSFULLY SAVED LABS DATA]")
         
     if microlab_flag:
-        print("[EXTRACTING LABS DATA]")
+        print("[EXTRACTING MICROLABS DATA]")
         microlab = preproc_microlabs(root_dir+'/'+version_path+"/microLab.csv.gz", local+'/cohort/'+cohort_output+'.csv.gz')
         microlab[['uniquepid','patientunitstayid', 'labid', 'labname', 'lab_time_from_admit']].to_csv(local+'/features/preproc_microlabs.csv.gz', compression='gzip', index=False)
-        print("[SUCCESSFULLY SAVED LABS DATA]")
+        print("[SUCCESSFULLY SAVED MICROLABS DATA]")
     
     if proc_flag:
         print("[EXTRACTING PROCEDURES DATA]")
