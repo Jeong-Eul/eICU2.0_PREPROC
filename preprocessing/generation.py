@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import importlib
 import warnings
+import pdb
 
 pd.set_option('mode.chained_assignment',  None) 
 warnings.simplefilter(action='ignore', category=FutureWarning) 
@@ -158,8 +159,8 @@ def generate_meds(data):
 def generate_ing(data):
     ing=pd.read_csv(local+ "/features/preproc_ing(selected)_icu.csv.gz", compression='gzip', header=0, index_col=None)
 
-    ing['start_time']=np.rint(ing['start_hours_from_admit']/24)
-    ing['stop_time']=ing['start_time'] + 1
+    ing['start_time']=np.rint(ing['start_hours_from_admit']/60)
+    ing['stop_time']=np.ceil(ing['stop_hours_from_admit']/60)
     ing['amount']=ing['drugrate'].apply(pd.to_numeric, errors='coerce')
     
     ing=ing.drop(columns=['start_hours_from_admit', 'stop_hours_from_admit', 'drugrate'])
@@ -185,8 +186,8 @@ def generate_ing(data):
 def generate_vent(data):
     vent=pd.read_csv(local+ "/features/preproc_vent_icu.csv.gz", compression='gzip', header=0, index_col=None)
 
-    vent['start_time']=np.rint(vent['ventstartoffset']/24)
-    vent['stop_time']=np.rint(vent['ventendoffset']/24)
+    vent['start_time']=np.rint(vent['ventstartoffset']/60)
+    vent['stop_time']=np.ceil(vent['ventendoffset']/60)
 
     vent=vent.drop(columns=['ventstartoffset', 'ventendoffset'])
     #####Sanity check
@@ -213,14 +214,10 @@ def tabularization(feat_med, feat_ing, feat_out, feat_chart, feat_lab, feat_vent
     
     print("# Unique gender: ", data.gender.nunique())
     print("# Unique ethnicity: ", data.ethnicity.nunique())
-    print("# Unique insurance: ", data.insurance.nunique())
-    print()
     print("=====================")
-    print()
     print('Number of patient: ', len(data.uniquepid.unique()))
     print('Number of stay: ', len(data.patientunitstayid.unique()))
     print('Expected value of observation: ', data['los(hour)'].sum())
-    print()
     print("=====================")
     print()
     
@@ -228,8 +225,8 @@ def tabularization(feat_med, feat_ing, feat_out, feat_chart, feat_lab, feat_vent
     for hid in tqdm(valid_stay_ids, desc = 'Tabularize EHR for total stay 16,120'):
         grp=data[data['patientunitstayid']==hid]
         los = int(grp['los(hour)'].values)
-        height = grp['admissionheight'].values
-        weight = grp['admissionweight'].values 
+        height = grp['admissionheight'].values[0]
+        weight = grp['admissionweight'].values[0]
         if not os.path.exists(local+"/csv/"+str(hid)):
             os.makedirs(local+"/csv/"+str(hid))
         
@@ -240,11 +237,11 @@ def tabularization(feat_med, feat_ing, feat_out, feat_chart, feat_lab, feat_vent
             feat=final_meds['celllabel'].unique()
             df2=final_meds[final_meds['patientunitstayid']==hid]
             if df2.shape[0]==0:
-                amount=pd.DataFrame(np.zeros([los,len(feat)]),columns=feat)
-                amount=amount.fillna(0)
-                amount.columns=pd.MultiIndex.from_product([["MEDS"], amount.columns])
+                dose=pd.DataFrame(np.zeros([los,len(feat)]),columns=feat)
+                dose=dose.fillna(0)
+                dose.columns=pd.MultiIndex.from_product([["MEDS"], dose.columns])
             else:
-                amount=df2.pivot_table(index='start_time',columns='celllabel',values='cellvaluenumeric')
+                dose=df2.pivot_table(index='start_time',columns='celllabel',values='cellvaluenumeric')
                 df2=df2.pivot_table(index='start_time',columns='celllabel',values='stop_time') #value는 큰 의미 없음
 
                 add_indices = pd.Index(range(los)).difference(df2.index) # 처방 된 시간과 los 비교 후 처방이 이루어지지 않은 시간 포인트만큼 시간 인덱스 생성
@@ -254,41 +251,47 @@ def tabularization(feat_med, feat_ing, feat_out, feat_chart, feat_lab, feat_vent
                 df2=df2.ffill()
                 df2=df2.fillna(0)
 
-                amount=pd.concat([amount, add_df])
-                amount=amount.sort_index()
-                amount=amount.ffill()
-                amount=amount.fillna(0)
+                dose=pd.concat([dose, add_df])
+                dose=dose.sort_index()
+                dose=dose.ffill()
+                dose=dose.fillna(0)
     
                 df2.iloc[:,0:]=df2.iloc[:,0:].sub(df2.index,0) #end time - start time
                 df2[df2>0]=1 # 약물 처방 시간 만큼 1
                 df2[df2<0]=0 #약을 처방 받지 않은 경우에는 0으로 채웠었기 때문에 sub 연산시 음 값을 가지게 되어 0으로 변환됨
         
-                amount.iloc[:,0:]=df2.iloc[:,0:]*amount.iloc[:,0:] # 실제 처방 된 경우의 값만 살아 남음
-                feat_df=pd.DataFrame(columns=list(set(feat)-set(amount.columns)))
-                amount=pd.concat([amount,feat_df],axis=1)
+                dose.iloc[:,0:]=df2.iloc[:,0:]*dose.iloc[:,0:] # 실제 처방 된 경우의 값만 살아 남음
+                feat_df=pd.DataFrame(columns=list(set(feat)-set(dose.columns)))
+                dose=pd.concat([dose,feat_df],axis=1)
 
 
-                amount=amount[feat]
-                amount=amount.fillna(0)
-                amount.columns=pd.MultiIndex.from_product([["MEDS"], amount.columns])
+                dose=dose[feat]
+                dose=dose.fillna(0)
+                dose.columns=pd.MultiIndex.from_product([["MEDS"], dose.columns])
         
                 
             if(dyn_csv.empty):
-                dyn_csv=amount
+                dyn_csv=dose
             else:
-                dyn_csv=pd.concat([dyn_csv,amount],axis=1)
+                dyn_csv=pd.concat([dyn_csv,dose],axis=1)
             
         
         ###INGS
         if(feat_ing):
             feat=final_ing['drugname'].unique()
+            feat_rate = [item + '_rate' for item in feat]
             df2=final_ing[final_ing['patientunitstayid']==hid]
             if df2.shape[0]==0:
                 amount=pd.DataFrame(np.zeros([los,len(feat)]),columns=feat)
                 amount=amount.fillna(0)
                 amount.columns=pd.MultiIndex.from_product([["INGS"], amount.columns])
+                
+                rate=pd.DataFrame(np.zeros([los,len(feat)]),columns=feat_rate)
+                rate=rate.fillna(0)
+                rate.columns=pd.MultiIndex.from_product([["RATE"], rate.columns])
             else:
                 amount=df2.pivot_table(index='start_time',columns='drugname',values='amount')
+                rate=df2.pivot_table(index='start_time',columns='drugname',values='infusionrate')
                 df2=df2.pivot_table(index='start_time',columns='drugname',values='stop_time')
                 add_indices = pd.Index(range(los)).difference(df2.index)
                 add_df = pd.DataFrame(index=add_indices, columns=df2.columns).fillna(np.nan)
@@ -302,23 +305,40 @@ def tabularization(feat_med, feat_ing, feat_out, feat_chart, feat_lab, feat_vent
                 amount=amount.ffill()
                 amount=amount.fillna(0)
                 
+
+                
+                rate=pd.concat([rate, add_df])
+                rate=rate.sort_index()
+                rate=rate.ffill()
+                rate=rate.fillna(-1)
+            
                 df2.iloc[:,0:]=df2.iloc[:,0:].sub(df2.index,0)
                 df2[df2>0]=1
                 df2[df2<0]=0
 
+                rate.iloc[:,0:]=df2.iloc[:,0:]*rate.iloc[:,0:]
                 amount.iloc[:,0:]=df2.iloc[:,0:]*amount.iloc[:,0:]
+                
                 feat_df=pd.DataFrame(columns=list(set(feat)-set(amount.columns)))
+                feat_df_rate=pd.DataFrame(columns=list(set(feat_rate)-set(rate.columns)))
+                
                 amount=pd.concat([amount,feat_df],axis=1)
+                rate = pd.concat([rate, feat_df_rate], axis=1)
 
                 amount=amount[feat]
+                rate=rate[feat_rate]
+                
                 amount=amount.fillna(0)
+                rate=rate.fillna(0)
                 
                 amount.columns=pd.MultiIndex.from_product([["INGS"], amount.columns])
+                rate.columns=pd.MultiIndex.from_product([["RATE"], rate.columns])
                 
             if(dyn_csv.empty):
-                dyn_csv=amount
+                dyn_csv= pd.concat([amount, rate],axis=1)
             else:
-                dyn_csv=pd.concat([dyn_csv,amount],axis=1)
+                ingredient = pd.concat([amount, rate],axis=1)
+                dyn_csv=pd.concat([dyn_csv,ingredient],axis=1)
             
             
         ###PROCS
