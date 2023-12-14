@@ -8,7 +8,7 @@ local = "/Users/DAHS/Desktop/early_prediction_of_circ_scl"+"/eicu-crd/preprocess
 
 class Integration_data():
     def __init__(self):
-        return self.categorical_encoding()
+        self.categorical_encoding()
         
     def create_stay_id(self):
         data=pd.read_csv(local+'/demo.csv', index_col = 0)
