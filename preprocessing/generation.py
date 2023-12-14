@@ -8,6 +8,7 @@ import os
 import importlib
 import warnings
 import pdb
+import gc
 
 pd.set_option('mode.chained_assignment',  None) 
 warnings.simplefilter(action='ignore', category=FutureWarning) 
@@ -223,6 +224,7 @@ def tabularization(feat_med, feat_ing, feat_out, feat_chart, feat_lab, feat_vent
     
     
     for hid in tqdm(valid_stay_ids, desc = 'Tabularize EHR for total stay 16,120'):
+        gc.collect()
         grp=data[data['patientunitstayid']==hid]
         los = int(grp['los(hour)'].values)
         height = grp['admissionheight'].values[0]
